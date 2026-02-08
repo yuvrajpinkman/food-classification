@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: food-classifier-backend
+    env: python
+    runtime: python-3.11.8
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 1 --timeout 180
