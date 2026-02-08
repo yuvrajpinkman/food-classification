@@ -18,7 +18,10 @@ def get_model():
     global model
     if model is None:
         print("Loading MobileNetV2 model...")
-        model = MobileNetV2(weights="imagenet")
+        model = MobileNetV2(
+            weights="imagenet",
+            input_shape=(160, 160, 3)
+        )
     return model
 
 # ---------- DATABASE (lazy load) ----------
