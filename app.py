@@ -68,3 +68,15 @@ def db_test():
     foods = get_db()
     count = foods.count_documents({})
     return {"status": "connected", "documents": count}
+
+@app.route("/db-insert-test")
+def db_insert_test():
+    foods = get_db()
+    foods.insert_one({
+        "name": "Ice Cream",
+        "calories": 207,
+        "protein": 3.5,
+        "fat": 11,
+        "source": "manual-test"
+    })
+    return {"status": "inserted"}
