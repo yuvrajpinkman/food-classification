@@ -3,6 +3,9 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 import io
+import os
+from pymongo import MongoClient
+
 
 app = Flask(__name__)
 
@@ -10,6 +13,14 @@ app = Flask(__name__)
 print("Loading MobileNetV3...")
 model = tf.keras.applications.MobileNetV3Small(weights="imagenet")
 print("Model loaded.")
+
+
+# MongoDB part
+MONGO_URI = os.environ.get("MONGO_URI")
+
+client = MongoClient(MONGO_URI)
+db = client["nutrition_db"]
+foods_collection = db["foods"]
 
 @app.route("/")
 def index():
@@ -35,6 +46,14 @@ def predict():
         "label": decoded[1].replace("_", " ").title(),
         "confidence": float(decoded[2])
     })
+
+@app.route("/db-test")
+def db_test():
+    count = foods_collection.count_documents({})
+    return {
+        "status": "connected",
+        "documents": count
+    }
 
 if __name__ == "__main__":
     app.run()
