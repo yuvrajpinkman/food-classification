@@ -44,8 +44,11 @@ def get_nutrition(food_name):
     foods = get_db()
     food_key = food_name.lower()
 
-    # 1️⃣ Check cache
-    cached = foods.find_one({"name": food_key}, {"_id": 0})
+    # 1️⃣ Check cache (exclude _id)
+    cached = foods.find_one(
+        {"name": food_key},
+        {"_id": 0}
+    )
     if cached:
         cached["source"] = "cache"
         return cached
@@ -76,13 +79,14 @@ def get_nutrition(food_name):
         "calories": nutrients.get("Energy", 0),
         "protein": nutrients.get("Protein", 0),
         "fat": nutrients.get("Total lipid (fat)", 0),
-        "carbs": nutrients.get("Carbohydrate, by difference", 0),
-        "source": "usda"
+        "carbs": nutrients.get("Carbohydrate, by difference", 0)
     }
 
-    # 3️⃣ Store in MongoDB
+    # 3️⃣ Store clean document
     foods.insert_one(nutrition)
 
+    # 4️⃣ Return clean JSON-safe object
+    nutrition["source"] = "usda"
     return nutrition
 
 # ------------------ ROUTES ------------------
