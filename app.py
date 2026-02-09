@@ -44,7 +44,7 @@ def get_nutrition(food_name):
     foods = get_db()
     food_key = food_name.lower()
 
-    # 1️⃣ Check cache (exclude _id)
+    # 1️⃣ Check cache (EXCLUDE _id)
     cached = foods.find_one(
         {"name": food_key},
         {"_id": 0}
@@ -69,6 +69,7 @@ def get_nutrition(food_name):
 
     food = data["foods"][0]
 
+    # 3️⃣ Extract nutrients
     nutrients = {
         n["nutrientName"]: n["value"]
         for n in food.get("foodNutrients", [])
@@ -79,15 +80,21 @@ def get_nutrition(food_name):
         "calories": nutrients.get("Energy", 0),
         "protein": nutrients.get("Protein", 0),
         "fat": nutrients.get("Total lipid (fat)", 0),
-        "carbs": nutrients.get("Carbohydrate, by difference", 0)
+        "carbs": nutrients.get("Carbohydrate, by difference", 0),
     }
 
-    # 3️⃣ Store clean document
-    foods.insert_one(nutrition)
+    # 4️⃣ INSERT A COPY (CRITICAL FIX)
+    foods.insert_one(nutrition.copy())
 
-    # 4️⃣ Return clean JSON-safe object
-    nutrition["source"] = "usda"
-    return nutrition
+    # 5️⃣ RETURN CLEAN JSON-SAFE OBJECT
+    return {
+        "name": nutrition["name"],
+        "calories": nutrition["calories"],
+        "protein": nutrition["protein"],
+        "fat": nutrition["fat"],
+        "carbs": nutrition["carbs"],
+        "source": "usda"
+    }
 
 # ------------------ ROUTES ------------------
 @app.route("/")
