@@ -7,11 +7,12 @@ from tensorflow.keras.applications import MobileNetV2
 import numpy as np
 from PIL import Image
 import io
+import requests
 from pymongo import MongoClient
 
 app = Flask(__name__)
 
-# ---------- MODEL (lazy load) ----------
+# ------------------ MODEL (lazy load) ------------------
 model = None
 
 def get_model():
@@ -24,7 +25,7 @@ def get_model():
         )
     return model
 
-# ---------- DATABASE (lazy load) ----------
+# ------------------ DATABASE (lazy load) ------------------
 client = None
 foods_collection = None
 
@@ -36,10 +37,66 @@ def get_db():
         foods_collection = db["foods"]
     return foods_collection
 
-# ---------- ROUTES ----------
+# ------------------ USDA NUTRITION ------------------
+USDA_API_KEY = os.environ.get("USDA_API_KEY")
+
+def get_nutrition(food_name):
+    foods = get_db()
+    food_key = food_name.lower()
+
+    # 1️⃣ Check cache
+    cached = foods.find_one({"name": food_key}, {"_id": 0})
+    if cached:
+        cached["source"] = "cache"
+        return cached
+
+    # 2️⃣ Call USDA API
+    search_url = "https://api.nal.usda.gov/fdc/v1/foods/search"
+    params = {
+        "query": food_name,
+        "pageSize": 1,
+        "api_key": USDA_API_KEY
+    }
+
+    response = requests.get(search_url, params=params)
+    data = response.json()
+
+    if "foods" not in data or len(data["foods"]) == 0:
+        return {"error": "Nutrition data not found"}
+
+    food = data["foods"][0]
+
+    nutrients = {
+        n["nutrientName"]: n["value"]
+        for n in food.get("foodNutrients", [])
+    }
+
+    nutrition = {
+        "name": food_key,
+        "calories": nutrients.get("Energy", 0),
+        "protein": nutrients.get("Protein", 0),
+        "fat": nutrients.get("Total lipid (fat)", 0),
+        "carbs": nutrients.get("Carbohydrate, by difference", 0),
+        "source": "usda"
+    }
+
+    # 3️⃣ Store in MongoDB
+    foods.insert_one(nutrition)
+
+    return nutrition
+
+# ------------------ ROUTES ------------------
 @app.route("/")
 def index():
     return jsonify({"status": "API running"})
+
+@app.route("/db-test")
+def db_test():
+    foods = get_db()
+    return {
+        "status": "connected",
+        "documents": foods.count_documents({})
+    }
 
 @app.route("/predict", methods=["POST"])
 def predict():
@@ -58,25 +115,13 @@ def predict():
     preds = model.predict(img)
     decoded = tf.keras.applications.mobilenet_v2.decode_predictions(preds, top=1)[0][0]
 
+    label = decoded[1].replace("_", " ").title()
+    confidence = float(decoded[2])
+
+    nutrition = get_nutrition(label)
+
     return jsonify({
-        "label": decoded[1].replace("_", " ").title(),
-        "confidence": float(decoded[2])
+        "label": label,
+        "confidence": confidence,
+        "nutrition": nutrition
     })
-
-@app.route("/db-test")
-def db_test():
-    foods = get_db()
-    count = foods.count_documents({})
-    return {"status": "connected", "documents": count}
-
-@app.route("/db-insert-test")
-def db_insert_test():
-    foods = get_db()
-    foods.insert_one({
-        "name": "Ice Cream",
-        "calories": 207,
-        "protein": 3.5,
-        "fat": 11,
-        "source": "manual-test"
-    })
-    return {"status": "inserted"}
