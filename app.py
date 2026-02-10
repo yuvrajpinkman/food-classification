@@ -2,6 +2,7 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
 import numpy as np
@@ -11,7 +12,7 @@ import requests
 from pymongo import MongoClient
 
 app = Flask(__name__)
-
+CORS(app)
 # ------------------ MODEL (lazy load) ------------------
 model = None
 
